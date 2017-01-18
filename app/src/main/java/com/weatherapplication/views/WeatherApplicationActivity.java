@@ -101,9 +101,11 @@ public class WeatherApplicationActivity extends AppCompatActivity {
             dataInViews(0);
         } else {
             daysToForecast = AppConstant.NUMBER_OF_DAYS_FORECAST;
+            //check whether network is available then only download data from services.
             if (checkNetworkConnectivity())
                 getIfGPSOn();
             else {
+                //show static data
                 getDataFromJson();
                 dataInViews(0);
                 Toast.makeText(WeatherApplicationActivity.this, getString(R.string._msg_no_network_available), Toast.LENGTH_SHORT).show();
@@ -196,9 +198,6 @@ public class WeatherApplicationActivity extends AppCompatActivity {
      * weatherData list having all the data from server
      */
     public void getDataFromServer(HashMap<String, String> details) {
-
-        //check whether network is available then only download data from services
-
         progress.setMessage(getResources().getString(R.string._lbl_download));
         progress.setProgressStyle(ProgressDialog.STYLE_SPINNER);
         progress.setIndeterminate(true);
@@ -302,6 +301,10 @@ public class WeatherApplicationActivity extends AppCompatActivity {
         super.onResume();
     }
 
+    /**
+     * This method will check the network connectivity for device
+     * @return isAvailable
+     */
     private Boolean checkNetworkConnectivity() {
         WifiManager wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         ConnectivityManager connectivityManager
