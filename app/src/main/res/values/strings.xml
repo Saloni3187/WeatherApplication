@@ -12,5 +12,7 @@
     <string name="_lbl_GPS_Message">GPS is disabled in your device. Would you like to enable it?</string>
     <string name="_lbl_enable_GPS">Goto Settings Page To Enable GPS</string>
     <string name="_lbl_cancel_GPS">Cancel</string>
+    <string name="_msg_service_error">Service Error, Showing static data</string>
+    <string name="_msg_no_network_available">Unable to connect download data due to network connectivity, Showing static data</string>
 
 </resources>

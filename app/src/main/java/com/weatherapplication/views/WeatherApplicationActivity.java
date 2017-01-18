@@ -2,10 +2,14 @@ package com.weatherapplication.views;
 
 import android.Manifest;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.location.Address;
 import android.location.Geocoder;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -15,6 +19,7 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.weatherapplication.R;
 import com.weatherapplication.constants.AppConstant;
@@ -61,8 +66,9 @@ public class WeatherApplicationActivity extends AppCompatActivity {
     private ArrayList<String> weatherType = new ArrayList<>();
     private ProgressDialog progress;
     private int daysToForecast;
-    private TextView location_name ;
-    private String cityName ;
+    private TextView location_name;
+    private String cityName;
+    private Boolean isAvailable = false;
 
     private static final int REQUEST_CODE_PERMISSION = 2;
     String mPermission = Manifest.permission.ACCESS_FINE_LOCATION;
@@ -95,7 +101,13 @@ public class WeatherApplicationActivity extends AppCompatActivity {
             dataInViews(0);
         } else {
             daysToForecast = AppConstant.NUMBER_OF_DAYS_FORECAST;
-            getIfGPSOn();
+            if (checkNetworkConnectivity())
+                getIfGPSOn();
+            else {
+                getDataFromJson();
+                dataInViews(0);
+                Toast.makeText(WeatherApplicationActivity.this, getString(R.string._msg_no_network_available), Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
@@ -104,22 +116,23 @@ public class WeatherApplicationActivity extends AppCompatActivity {
         daysToForecast = 5;
         ParseDataFromLocal parseDataFromLocal = new ParseDataFromLocal(this);
         WeatherDetails weatherDetails = parseDataFromLocal.getDataFromJson();
-        maxTemp =weatherDetails.getMaxTemp();
-        minTemp =weatherDetails.getMaxTemp();
-        day=weatherDetails.getDateValue();
-        cityName= weatherDetails.getCity();
-        weatherType= weatherDetails.getType_of_weather();
+        maxTemp = weatherDetails.getMaxTemp();
+        minTemp = weatherDetails.getMaxTemp();
+        day = weatherDetails.getDateValue();
+        cityName = weatherDetails.getCity();
+        weatherType = weatherDetails.getType_of_weather();
         setDataInViewsFromJson();
     }
 
     //This method will inflate the view based on number of forecast
-    private void setDataInViewsFromJson(){
-        for (int i=0;i<daysToForecast;i++){
+    private void setDataInViewsFromJson() {
+        for (int i = 0; i < daysToForecast; i++) {
             setDataInView(i);
         }
     }
 
-    /**Method will inflate the view based on the forecast data.
+    /**
+     * Method will inflate the view based on the forecast data.
      * and set data into the respective view
      *
      * @param i
@@ -131,17 +144,18 @@ public class WeatherApplicationActivity extends AppCompatActivity {
         max_temp = (TextView) v.findViewById(R.id.txt_max);
         min_temp = (TextView) v.findViewById(R.id.txt_min);
         img_view = (ImageView) v.findViewById(R.id.img_weather);
-            int resourceId = TextToImageUtil.getImageDrawable(weatherType.get(i).toLowerCase());
-            img_view.setBackgroundResource(resourceId);
-            try {
-                dt.setText(day.get(i));
-                max_temp.setText(maxTemp.get(i));
-                min_temp.setText(minTemp.get(i));
-                v.setId(R.id.txt_day + i);
+        int resourceId = TextToImageUtil.getImageDrawable(weatherType.get(i).toLowerCase());
+        img_view.setBackgroundResource(resourceId);
+        try {
+            dt.setText(day.get(i));
+            max_temp.setText(maxTemp.get(i));
+            min_temp.setText(minTemp.get(i));
+            v.setId(R.id.txt_day + i);
 
-            } catch (Exception exc) {
-                exc.printStackTrace();
-            } parentPanel.addView(v);
+        } catch (Exception exc) {
+            exc.printStackTrace();
+        }
+        parentPanel.addView(v);
     }
 
     public void getClickedDayDetails(View v) {
@@ -154,6 +168,7 @@ public class WeatherApplicationActivity extends AppCompatActivity {
 
     /**
      * method will set parsed data in views based on the selected tile
+     *
      * @param i
      */
     private void dataInViews(int i) {
@@ -180,7 +195,9 @@ public class WeatherApplicationActivity extends AppCompatActivity {
      * Method is used to retrieve data from server and parse data by calling parseServerData(weather data)
      * weatherData list having all the data from server
      */
-    public void getDataFromServer(HashMap<String,String> details) {
+    public void getDataFromServer(HashMap<String, String> details) {
+
+        //check whether network is available then only download data from services
 
         progress.setMessage(getResources().getString(R.string._lbl_download));
         progress.setProgressStyle(ProgressDialog.STYLE_SPINNER);
@@ -201,10 +218,13 @@ public class WeatherApplicationActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(Call<WeatherData> call, Throwable t) {
+                getDataFromJson();
+                setDataInView(0);
+                Toast.makeText(WeatherApplicationActivity.this, getString(R.string._msg_service_error), Toast.LENGTH_SHORT).show();
             }
         });
-
     }
+
     /*
     Method will check the status of GPS
     if enables get the locaion
@@ -212,7 +232,7 @@ public class WeatherApplicationActivity extends AppCompatActivity {
      */
     private void getIfGPSOn() {
         GPSTracker gpsTracker = new GPSTracker(this);
-        if(gpsTracker.canGetLocation()){
+        if (gpsTracker.canGetLocation()) {
             double lat = gpsTracker.getLatitude();
             double lng = gpsTracker.getLongitude();
             Geocoder geocoder;
@@ -222,14 +242,14 @@ public class WeatherApplicationActivity extends AppCompatActivity {
                 addresses = geocoder.getFromLocation(lat, lng, 1);
                 cityName = addresses.get(0).getLocality();
                 HashMap<String, String> options = new HashMap<>();
-                options.put("q",cityName);
-                options.put("cnt",AppConstant.NUMBER_OF_DAYS_FORECAST+"");
+                options.put("q", cityName);
+                options.put("cnt", AppConstant.NUMBER_OF_DAYS_FORECAST + "");
                 options.put("APPID", URLConstants.APPID);
                 getDataFromServer(options);
-            }catch(IOException exc) {
+            } catch (IOException exc) {
                 exc.printStackTrace();
             }
-        }else{
+        } else {
             AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(this);
             alertDialogBuilder.setMessage(getResources().getString(R.string._lbl_GPS_Message))
                     .setCancelable(false)
@@ -255,9 +275,11 @@ public class WeatherApplicationActivity extends AppCompatActivity {
             alert.show();
         }
     }
+
     /**
      * Method will parse server data and save
      * for different views
+     *
      * @param weatherData
      */
     private void parseServerData(WeatherData weatherData) {
@@ -275,7 +297,19 @@ public class WeatherApplicationActivity extends AppCompatActivity {
             }
         }
     }
+
     protected void onResume() {
         super.onResume();
+    }
+
+    private Boolean checkNetworkConnectivity() {
+        WifiManager wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+        ConnectivityManager connectivityManager
+                = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+        if (wifi.isWifiEnabled() || (activeNetworkInfo != null && activeNetworkInfo.isConnected())) {
+            isAvailable = true;
+        }
+        return isAvailable;
     }
 }
